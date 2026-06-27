@@ -22,7 +22,8 @@ if [ "$#" -ne 2 ]; then
 fi 
 
 PROJECT_NAME=$1
-PROJECT_REQUESTER=$2
+PROJECT_USERS=$2
+PROJECT_REQUESTER=${PROJECT_USERS%%,*}  # Get the first user from the comma-separated list
 MAINLINE_STREAMS="Main ArtSource Tools"
 RELEASE_STREAMS="Staging Production Live"
 STREAM_DEPTH=2
@@ -43,6 +44,21 @@ Description: Stream depot automatically created on $(date).  Creation requested 
 Parent: {{{STREAM_PARENT}}}
 ParentView: {{{PARENT_VIEW}}}
 Paths: share ...
+"""
+P4_GROUP_SPEC="""
+Group: ${PROJECT_NAME}
+Description: Group automatically created on $(date).  Creation requested by ${PROJECT_REQUESTER}.
+MaxResults:	unset
+MaxScanRows:	unset
+MaxLockTime:	unset
+MaxOpenFiles:	unset
+MaxMemory:	unset
+Timeout:	unset
+IdleTimeout:	unset
+PasswordTimeout:	unset
+Subgroups:
+Users:
+    $(echo "${PROJECT_USERS}" | sed 's/,/\n    /g')
 """
 
 # P4 VALIDATION
@@ -151,13 +167,23 @@ EOF
     PREVIOUS_PARENT="//${PROJECT_NAME}/release/${STREAM_NAME}"
     OPTIONS="Options:	allsubmit unlocked notoparent fromparent mergedown"
 done
-# check if group if permission group exists, skip group creation
-#   - create group if it doesn't exist
-# check if user is in the permission group, skip user addition
-#   - add user to group if not already a member
 
-# CLEAN UP
-# Delete any P4 workspaces
-# 
+# GROUPS and PERMISSIONS!
+if ! p4 groups | grep -q "${PROJECT_NAME}"; then
+    log "INFO" "Group ${PROJECT_NAME} does not exist. Creating group..."
+    p4 group -i << EOF
+${P4_GROUP_SPEC}
+EOF
+    if [ $? -ne 0 ]; then
+        log "ERROR" "Failed to create group ${PROJECT_NAME}."
+        exit 1
+    fi
+
+    log "INFO" "Group ${PROJECT_NAME} created successfully."
+else
+    log "INFO" "Group ${PROJECT_NAME} already exists. Skipping group creation."
+fi
+
+if 
 
 log "INFO" "### Finished new P4 project setup script. ###"
