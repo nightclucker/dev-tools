@@ -202,8 +202,6 @@ EOF
     fi
 }
 
-
-
 give_p4_group_permissions_to_project()
 {
     _save_protect_to_file()
