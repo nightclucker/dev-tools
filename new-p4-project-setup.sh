@@ -181,10 +181,12 @@ EOF
             log "INFO" "Stream ${stream_name} already exists. Skipping stream creation."
         fi
 
+        # Set this to the current stream so that the next stream will use this one as it's parent.
         stream_parent="//${PROJECT_NAME}/${stream_type}/${stream_name}"
     done
 }
 
+# Adds the users list to a group so that we can give them permissions.
 create_p4_project_group()
 {
     if ! p4 groups | grep -q "${PROJECT_NAME}"; then
@@ -203,6 +205,7 @@ EOF
     fi
 }
 
+# Gives the group permissions to the project.
 give_p4_group_permissions_to_project()
 {
     _save_protect_to_file()
