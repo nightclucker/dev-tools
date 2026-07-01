@@ -102,84 +102,69 @@ EOF
     fi
 }
 
-create_mainline_streams()
+create_streams()
 {
-    for stream in ${MAINLINE_STREAMS}; do
-        log "INFO" "Processing stream: ${stream}"
-        
-        STREAM_NAME="${stream}"
-            # Stream settings
-            SUB_NAME="dev"
-            STREAM_TYPE="mainline"
-            STREAM_PARENT="none"
-            PARENT_VIEW="inherit"
+    local sub_name=$2
+    local stream_type=$3
+    local stream_parent=$4
+    local base_parent=$4
+    local stream_options="Options:	allsubmit unlocked notoparent fromparent mergedown"
 
-            # Update the spec with this streams settings.
-            spec=${STREAM_SPEC//\{\{\{STREAM_NAME\}\}\}/${STREAM_NAME}}
-            spec=${spec//\{\{\{SUB_NAME\}\}\}/${SUB_NAME}}
-            spec=${spec//\{\{\{STREAM_PARENT\}\}\}/${STREAM_PARENT}}
-            spec=${spec//\{\{\{STREAM_TYPE\}\}\}/${STREAM_TYPE}}
-            spec=${spec//\{\{\{PARENT_VIEW\}\}\}/${PARENT_VIEW}}
+    log "INFO" "${sub_name}, ${stream_type}, ${stream_parent}, ${base_parent}"
 
-            # If the stream doesn't exist then create it.
-            if ! p4 streams //${PROJECT_NAME}/${SUB_NAME}/... | grep -q "${STREAM_NAME}" ; then
-                log "INFO" "Stream ${STREAM_NAME} does not exist. Creating stream..."
-                p4 stream -i << EOF
-${spec}
-EOF
-                # Stop here if there was an error in creating the stream.
-                if [ $? -ne 0 ]; then
-                    log "ERROR" "Failed to create stream ${STREAM_NAME}."
-                    exit 1
-                fi
-            log "INFO" "Stream //${PROJECT_NAME}/${SUB_NAME}/${STREAM_NAME} created successfully."
-        else
-            log "INFO" "Stream ${STREAM_NAME} already exists. Skipping stream creation."
+    for stream_name in $1; do
+        log "INFO" "Processing stream: ${stream_name}"
+
+        parent_view="inherit"
+
+        # If the stream is not a release stream or the parent is the base stream,
+        # then allow the merge down.
+        if [[ "${stream_type}" != "release" ]] || [[ "${stream_parent}" == "${base_parent}" ]]; then
+            stream_options="Options:	allsubmit unlocked toparent fromparent mergedown"
         fi
-    done
-}
 
-create_release_streams()
-{
-    PREVIOUS_PARENT="//${PROJECT_NAME}/dev/Main"
-    OPTIONS="Options:	allsubmit unlocked toparent fromparent mergedown"
+        # Mainline streams do not have a parent.
+        if [[ "$stream_type" == "mainline" ]]; then
+            stream_parent="none"
+        fi
 
-    for stream in ${RELEASE_STREAMS}; do
-        log "INFO" "Processing stream: ${stream}"
+        # Release streams logic.
+        if [[ "$stream_type" == "release" ]]; then
+            parent_view="noinherit"
 
-        # Streaming settings
-        STREAM_NAME="${stream}"
-        SUB_NAME="release"
-        STREAM_TYPE="release"
-        STREAM_PARENT="${PREVIOUS_PARENT}"
-        PARENT_VIEW="inherit"
+            # Don't allow merge down to the parents.
+            stream_options="Options:	allsubmit unlocked notoparent fromparent mergedown"
+
+            # Release stream whose parent _is_ the base parent are allowed to merge down.
+            if [[ "${stream_parent}" == "${base_parent}" ]]; then
+                stream_options="Options:	allsubmit unlocked toparent fromparent mergedown"
+            fi
+        fi
 
         # Update the spec with this streams settings.
-        spec=${STREAM_SPEC//\{\{\{STREAM_NAME\}\}\}/${STREAM_NAME}}
-        spec=${spec//\{\{\{SUB_NAME\}\}\}/${SUB_NAME}}
-        spec=${spec//\{\{\{STREAM_PARENT\}\}\}/${STREAM_PARENT}}
-        spec=${spec//\{\{\{STREAM_TYPE\}\}\}/${STREAM_TYPE}}
-        spec=${spec//\{\{\{PARENT_VIEW\}\}\}/${PARENT_VIEW}}
+        local spec=${STREAM_SPEC//\{\{\{STREAM_NAME\}\}\}/${stream_name}}
+        spec=${spec//\{\{\{SUB_NAME\}\}\}/${sub_name}}
+        spec=${spec//\{\{\{STREAM_PARENT\}\}\}/${stream_parent}}
+        spec=${spec//\{\{\{STREAM_TYPE\}\}\}/${stream_type}}
+        spec=${spec//\{\{\{PARENT_VIEW\}\}\}/${parent_view}}
 
-        if ! p4 streams //${PROJECT_NAME}/${SUB_NAME}/... | grep -q "${STREAM_NAME}" ; then
-            log "INFO" "Stream ${STREAM_NAME} does not exist. Creating stream..."
+        if ! p4 streams //${PROJECT_NAME}/${sub_name}/... | grep -q "${stream_name}" ; then
+            log "INFO" "Stream ${stream_name} does not exist. Creating stream..."
             p4 stream -i << EOF
 ${spec}
-${OPTIONS}
 EOF
             # Stop here if the stream could not be created. 
             if [ $? -ne 0 ]; then
-                log "ERROR" "Failed to create stream ${STREAM_NAME}."
+                log "ERROR" "Failed to create stream ${stream_name}."
                 exit 1
             fi
 
-            log "INFO" "Stream //${PROJECT_NAME}/${SUB_NAME}/${STREAM_NAME} created successfully."
+            log "INFO" "Stream //${PROJECT_NAME}/${sub_name}/${stream_name} created successfully."
         else
-            log "INFO" "Stream ${STREAM_NAME} already exists. Skipping stream creation."
+            log "INFO" "Stream ${stream_name} already exists. Skipping stream creation."
         fi
 
-        PREVIOUS_PARENT="//${PROJECT_NAME}/release/${STREAM_NAME}"
-        OPTIONS="Options:	allsubmit unlocked notoparent fromparent mergedown"
+        stream_parent="//${PROJECT_NAME}/${stream_type}/${stream_name}"
     done
 }
 
@@ -265,8 +250,8 @@ validate_logged_in_p4_users_permissions
 
 # PROJECT DEPOT AND STREAM CREATION
 create_p4_depot
-create_mainline_streams
-create_release_streams
+create_streams "${MAINLINE_STREAMS}" "dev" "mainline" "none"
+create_streams "${RELEASE_STREAMS}" "release" "release" "//${PROJECT_NAME}/dev/Main"
 
 # GROUPS and PERMISSIONS!
 create_p4_project_group
