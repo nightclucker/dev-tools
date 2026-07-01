@@ -2,13 +2,22 @@
 # This script sets up a new P4 project by creating the necessary directory structure and files.
 # Need to run this script with the project name, a valid p4 user name.
 
-
+# Name of the project
 PROJECT_NAME=$1
+
+# Comma delimited list of p4 user names that will be grouped into this project.
+# The first user in the list must be the project owner.
 PROJECT_USERS=$2
 PROJECT_REQUESTER=${PROJECT_USERS%%,*}  # Get the first user from the comma-separated list
+
+# List of streams that need to be created.
 MAINLINE_STREAMS="Main ArtSource Tools"
 RELEASE_STREAMS="Staging Production Live"
+
+# The depth the depot will be built with.  for example, 2: //Project/1/2
 STREAM_DEPTH=2
+
+# Specs for P4 depots.
 DEPOT_SPEC="""
 Depot: ${PROJECT_NAME}
 Owner: ${PROJECT_REQUESTER}
@@ -17,6 +26,8 @@ Description: Project depot automatically created on $(date).  Creation requested
 StreamDepth: ${STREAM_DEPTH}
 Map: ${PROJECT_NAME}/...
 """
+
+# Specs for p4 streams.
 STREAM_SPEC="""
 Stream: //${PROJECT_NAME}/{{{SUB_NAME}}}/{{{STREAM_NAME}}}
 Owner: ${PROJECT_REQUESTER}
@@ -27,6 +38,8 @@ Parent: {{{STREAM_PARENT}}}
 ParentView: {{{PARENT_VIEW}}}
 Paths: share ...
 """
+
+# Speces for P4 groups.
 P4_GROUP_SPEC="""
 Group: ${PROJECT_NAME}
 Description: Group automatically created on $(date).  Creation requested by ${PROJECT_REQUESTER}.
@@ -57,6 +70,7 @@ log()
     logger -t "${LOGGER_NAME}" "[${level}] ${message}"
 }
 
+# Checks if the P4 cli tools are installed, otherwise exits.
 validate_p4_install()
 {
     if [ ! -x "$(which p4)" ]; then
@@ -65,15 +79,16 @@ validate_p4_install()
     fi
 }
 
+# Checks if a p4 user is logged in, otherwise exits.
 validate_logged_in_p4_user()
 {
-    # Check if p4 user is logged in.
     if ! p4 login -s > /dev/null 2>&1; then
         log "ERROR" "p4 user is not logged in."
         exit 1
     fi
 }
 
+# Checks if the p4 user is a super user.  Only super users can create depots.  Exit if they are not.
 validate_logged_in_p4_users_permissions()
 {
     if ! p4 group -o "Super" | grep "$LOGGED_IN_USER" > /dev/null 2>&1; then
@@ -102,15 +117,16 @@ EOF
     fi
 }
 
+# Creates a stream using a given list of stream names.
+# Takes four arguments; stream_names sub_name stream_types stream_parent
+# example: create_streams "Main ArtSource Tools" "dev" "mainline" "none"
 create_streams()
 {
     local sub_name=$2
     local stream_type=$3
     local stream_parent=$4
     local base_parent=$4
-    local stream_options="Options:	allsubmit unlocked notoparent fromparent mergedown"
-
-    log "INFO" "${sub_name}, ${stream_type}, ${stream_parent}, ${base_parent}"
+    local stream_options="Options:	allsubmit unlocked toparent fromparent mergedown"
 
     for stream_name in $1; do
         log "INFO" "Processing stream: ${stream_name}"
@@ -152,6 +168,7 @@ create_streams()
             log "INFO" "Stream ${stream_name} does not exist. Creating stream..."
             p4 stream -i << EOF
 ${spec}
+${stream_options}
 EOF
             # Stop here if the stream could not be created. 
             if [ $? -ne 0 ]; then
@@ -170,7 +187,6 @@ EOF
 
 create_p4_project_group()
 {
-    # GROUPS and PERMISSIONS!
     if ! p4 groups | grep -q "${PROJECT_NAME}"; then
         log "INFO" "Group ${PROJECT_NAME} does not exist. Creating group..."
         p4 group -i << EOF
@@ -196,7 +212,8 @@ give_p4_group_permissions_to_project()
 
     _is_group_in_protections()
     {
-        if ! grep -q "${PROTECTIONS}" p4_protections.tmp; then
+        # Return 0 if the group is in the p4 protections table.
+        if grep -qF "${PROTECTIONS}" p4_protections.tmp; then
             return 0
         fi
         return 1
@@ -223,6 +240,8 @@ give_p4_group_permissions_to_project()
         else
             log "INFO" "Protections for group ${PROJECT_NAME} added successfully."
         fi
+    else
+        log "INFO" "Protections for group ${PROJECT_NAME} already exists. Skipping group creation."
     fi
 
     # Remove the temp files. 
