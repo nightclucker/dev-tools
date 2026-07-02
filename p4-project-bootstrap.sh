@@ -233,6 +233,7 @@ Name: ${name}
 Type: mainline
 Description: ${description}
 Parent: none
+ParentView: inherit
 Paths: share ...
 Options: allsubmit unlocked toparent fromparent mergedown
 EOF
