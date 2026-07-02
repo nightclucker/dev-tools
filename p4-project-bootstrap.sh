@@ -232,6 +232,7 @@ Owner: ${OWNER_USER}
 Name: ${name}
 Type: mainline
 Description: ${description}
+Parent: none
 Paths: share ...
 Options: allsubmit unlocked toparent fromparent mergedown
 EOF
