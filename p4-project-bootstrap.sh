@@ -370,7 +370,6 @@ update_protections_table()
 
     local protect_file
     protect_file="$(mktemp)"
-    trap 'rm -f "${protect_file}"' RETURN
 
     p4 protect -o > "${protect_file}"
 
@@ -379,6 +378,8 @@ update_protections_table()
     # further down the table (protection order matters in p4).
     awk -v rule="${new_rule}" \
         '/^Protections:/{print; print rule; next}1' "${protect_file}" | p4 protect -i
+
+    rm -f "${protect_file}"
 
     if ! protection_exists; then
         log_error "Failed to add protections for group ${PROJECT_NAME}."
