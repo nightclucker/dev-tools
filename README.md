@@ -77,6 +77,8 @@ Example:
 ./p4-project-bootstrap.sh MyGame alice,bob,carol
 ```
 
+
+
 This creates the `MyGame` depot, its mainline/release streams, a `MyGame` group with `alice`, `bob`, and `carol` as members (owned by `alice`), and grants that group write access to `//MyGame/...`.
 
 Progress and errors are logged to stdout and to the system log (via `logger`, tag `p4-project-bootstrap`).
